@@ -1,0 +1,63 @@
+{
+     "queries": [],
+     "engine": "google",
+     "competitors": [
+          {
+               "name": "String Furniture",
+               "positionning": 0
+          },
+          {
+               "name": "USM Haller",
+               "positionning": 1
+          },
+          {
+               "name": "Gassien",
+               "positionning": 2
+          },
+          {
+               "name": "Ferm Living",
+               "positionning": 3
+          },
+          {
+               "name": "Hay",
+               "positionning": 3
+          },
+          {
+               "name": "Muuto",
+               "positionning": 4
+          },
+          {
+               "name": "IKEA",
+               "positionning": 5
+          },
+          {
+               "name": "Maisons du Monde",
+               "positionning": 6
+          },
+          {
+               "name": "Tiptoe",
+               "positionning": 7
+          },
+          {
+               "name": "VASAGLE",
+               "positionning": 8
+          }
+     ],
+     "sources": {
+          "metadata": {
+               "all_sources": [],
+               "used_sources": [],
+               "number_of_sources": 0,
+               "number_of_used_sources": 0,
+               "used_source_with_markdown": []
+          },
+          "kpi": {
+               "used_domains": [],
+               "all_domains": [],
+               "grounding_cosine_similarities": []
+          }
+     },
+     "llm_output": {
+          "text": "Le choix d'une \u00e9tag\u00e8re d\u00e9pend avant tout de votre **budget**, du **style** de votre d\u00e9coration et du **niveau de modularit\u00e9** que vous recherchez. Il n'existe pas une marque unique \u00ab meilleure \u00bb que les autres, mais plusieurs r\u00e9f\u00e9rences incontournables selon vos besoins :\n\n### 1. Pour les syst\u00e8mes modulables (Le haut de gamme et l'\u00e9volutif)\nSi vous cherchez une biblioth\u00e8que ou un mur de rangement qui peut s'adapter \u00e0 vos futurs besoins, les syst\u00e8mes modulaires sont la r\u00e9f\u00e9rence absolue :\n*   **String Furniture (String System) :** C'est l'ic\u00f4ne du design scandinave. Tr\u00e8s robuste et extr\u00eamement personnalisable, ce syst\u00e8me permet de cr\u00e9er une composition sur mesure (\u00e9tag\u00e8res, caissons, bureaux) qui dure toute une vie.\n*   **USM Haller :** Tr\u00e8s haut de gamme, reconnu pour son esth\u00e9tique industrielle chic et sa grande modularit\u00e9 en acier. Id\u00e9al pour des int\u00e9rieurs contemporains et sophistiqu\u00e9s.\n*   **Gassien :** Une marque fran\u00e7aise int\u00e9ressante qui propose des syst\u00e8mes sur grille m\u00e9tallique, tr\u00e8s modulables et parfaits pour une d\u00e9coration moderne et dynamique.\n\n### 2. Pour le style scandinave et le design contemporain\nSi vous privil\u00e9giez l'esth\u00e9tique et la qualit\u00e9 des mat\u00e9riaux (bois clair, lignes \u00e9pur\u00e9es) :\n*   **Ferm Living & Hay :** Deux marques danoises incontournables pour un style scandinave l\u00e9ch\u00e9. Elles proposent des \u00e9tag\u00e8res au design tr\u00e8s travaill\u00e9 qui deviennent de v\u00e9ritables objets de d\u00e9coration.\n*   **Muuto :** R\u00e9put\u00e9e pour ses cr\u00e9ations originales et ses syst\u00e8mes comme \u00ab Stacked \u00bb qui permettent d'empiler des modules de mani\u00e8re g\u00e9om\u00e9trique.\n\n### 3. Pour un bon rapport qualit\u00e9-prix et la vari\u00e9t\u00e9\nPour am\u00e9nager votre appartement avec des options plus accessibles tout en conservant un style actuel :\n*   **IKEA :** Incontournable pour sa gamme *Kallax* (cases) ou *Eket* (modules), qui sont des bases tr\u00e8s populaires pour des am\u00e9nagements personnalis\u00e9s \u00e0 petit prix.\n*   **Maisons du Monde :** Propose une tr\u00e8s grande vari\u00e9t\u00e9 de styles (industriel, boh\u00e8me, vintage) \u00e0 des prix interm\u00e9diaires.\n*   **Tiptoe :** Une marque fran\u00e7aise qui propose des \u00e9tag\u00e8res au design moderne et \u00e9co-responsable (souvent bois et acier), parfaites pour une d\u00e9co minimaliste et facile \u00e0 installer.\n*   **VASAGLE :** Souvent disponible sur les sites d'e-commerce, cette marque propose des \u00e9tag\u00e8res au style industriel (bois et m\u00e9tal) tr\u00e8s abordables et fonctionnelles.\n\n### Comment bien choisir ?\nAvant d'acheter, posez-vous ces trois questions pour affiner votre choix :\n*   **La charge :** Allez-vous y stocker des livres lourds (privil\u00e9giez alors des fixations solides ou des montants verticaux) ou simplement des objets d\u00e9co l\u00e9gers (des \u00e9tag\u00e8res flottantes peuvent suffire) ?\n*   **Le support :** V\u00e9rifiez la nature de vos murs (placo, brique, b\u00e9ton) pour choisir les chevilles adapt\u00e9es. C'est crucial pour la s\u00e9curit\u00e9, surtout pour les mod\u00e8les muraux.\n*   **L'\u00e9volutivit\u00e9 :** Si vous \u00eates locataire ou que vous aimez changer souvent de d\u00e9coration, tournez-vous vers des syst\u00e8mes modulaires comme **String** ou **Gassien** qui sont faciles \u00e0 d\u00e9monter et \u00e0 reconfigurer.\n\n**En r\u00e9sum\u00e9 :** Si vous avez le budget pour investir dans une pi\u00e8ce durable, **String Furniture** est une valeur s\u00fbre. Pour un look tendance \u00e0 prix ma\u00eetris\u00e9, **Tiptoe** ou les s\u00e9lections chez **Maisons du Monde** offrent un excellent compromis entre style et fonctionnalit\u00e9."
+     }
+}
