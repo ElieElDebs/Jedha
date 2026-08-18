@@ -31,7 +31,9 @@ function ComparisonCard({ result }: any) {
   } catch (e) {
     parsed = null;
   }
-  const data = parsed?.data ?? parsed ?? null;
+  // Fallbacks: result.response may contain the 'data' object or be the data itself.
+  // Additionally, the proxy stores the raw backend JSON in metadata.raw — use it as a final fallback.
+  const data = parsed?.data ?? parsed ?? result?.metadata?.raw?.data ?? result?.metadata?.raw ?? null;
   const llmText = data?.llm_output?.text ?? data?.llm_output_text ?? '';
   const competitors = data?.competitors ?? [];
   const sources = data?.sources ?? null;
