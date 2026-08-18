@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+:root {
+  --background: #edf7f1;
+  --background-strong: #e1f3e7;
+  --foreground: #173121;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-alt: #f4fbf7;
+  --surface-soft: #f4f1eb;
+  --stroke: rgba(23, 49, 33, 0.08);
+  --primary: #2f7d5e;
+  --primary-strong: #215d47;
+  --primary-soft: #dff4e8;
+  --accent: #8ccbb0;
+  --accent-soft: #edf9f3;
+  --earth: #c9a98b;
+  --earth-soft: #f6efe7;
+  --clay: #b98272;
+  --clay-soft: #f9efee;
+  --shadow-soft: 0 18px 45px rgba(34, 82, 62, 0.12);
+  --shadow-card: 0 10px 24px rgba(24, 51, 39, 0.08);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(143, 204, 176, 0.28), transparent 25%),
+    radial-gradient(circle at bottom right, rgba(74, 153, 122, 0.12), transparent 22%),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(47, 125, 94, 0.18);
+}
+
+@layer components {
+  .material-card {
+    @apply rounded-[28px] border border-[rgba(23,49,33,0.08)] bg-white/80 shadow-[var(--shadow-card)] backdrop-blur-sm;
+  }
+
+  .material-panel {
+    @apply rounded-[22px] border border-[rgba(23,49,33,0.08)] bg-[var(--surface-soft)]/90;
+  }
+
+  .material-input {
+    @apply w-full rounded-2xl border border-[rgba(23,49,33,0.10)] bg-[var(--panel-alt)] px-3.5 py-2.75 text-sm text-slate-800 outline-none transition duration-200 placeholder:text-slate-400 focus:border-[var(--primary)] focus:bg-white focus:ring-4 focus:ring-[rgba(47,125,94,0.12)];
+  }
+
+  .material-button-primary {
+    @apply inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2f7d5e_0%,#4da27a_100%)] px-4 py-2.75 text-sm font-medium text-white shadow-[0_8px_18px_rgba(47,125,94,0.25)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_22px_rgba(47,125,94,0.28)] focus:outline-none focus:ring-4 focus:ring-[rgba(47,125,94,0.18)];
+  }
+
+  .material-button-secondary {
+    @apply inline-flex items-center justify-center rounded-2xl border border-[rgba(23,49,33,0.10)] bg-white px-4 py-2.75 text-sm font-medium text-slate-700 transition duration-200 hover:bg-[var(--surface-soft)] focus:outline-none focus:ring-4 focus:ring-[rgba(23,49,33,0.08)];
+  }
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  width: min(1200px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: min(100% - 1rem, 1200px);
+  }
+}
