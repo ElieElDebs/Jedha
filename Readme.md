@@ -79,9 +79,6 @@ Endpoints disponibles (tous protégés par le header `X-API-KEY`, sauf `/`) :
 - `GET /report/openai/get/?prompt=...` — génère un rapport via OpenAISniffer
 - `GET /report/gemini/get/?prompt=...` — génère un rapport via GeminiSniffer
 
-Chaque route renvoie `{"status": ..., "message": ..., "data": <report>}` où `data`
-suit la forme commune décrite dans `CLAUDE.md` (`queries`, `sources`, `llm_output`).
-
 ## Lancer le script CLI
 
 `Script/evaluate.py` exécute le flux complet en ligne de commande (prompt saisi de
