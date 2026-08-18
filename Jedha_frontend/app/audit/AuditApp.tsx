@@ -31,26 +31,26 @@ export default function AuditApp() {
         <main className="flex-1 lg:ml-[280px]">
           <div className="space-y-6">
             <section className="material-card overflow-hidden p-0">
-              <div className="bg-[linear-gradient(135deg,rgba(143,204,176,0.38),rgba(236,249,241,0.96),rgba(246,239,231,0.82),rgba(255,255,255,0.96))] p-5 sm:p-6">
+              <div className="p-5 sm:p-6" style={{ backgroundColor: 'var(--primary-soft)' }}>
                 <div className="mb-5 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800/80">Audit</p>
-                    <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Run an Audit</h1>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--primary-strong)' }}>Audit</p>
+                    <h1 className="mt-2 text-2xl font-semibold tracking-tight" style={{ color: 'var(--foreground)' }}>Run an Audit</h1>
                   </div>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/80 text-lg shadow-sm ring-1 ring-emerald-200/70">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl text-lg shadow-sm" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
                     🌿
                   </div>
                 </div>
 
-                <p className="mb-5 max-w-2xl text-sm leading-6 text-slate-700">
+                <p className="mb-5 max-w-2xl text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
                   Compare AI providers with a structured, sustainability-minded audit workflow.
                 </p>
 
                 <QueryEditor onSubmit={handleSubmit} />
 
                 {loading && (
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-600" />
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium" style={{ borderColor: 'var(--primary)', backgroundColor: 'var(--primary-soft)', color: 'var(--primary-strong)' }}>
+                    <span className="h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: 'var(--primary)' }} />
                     Running audit…
                   </div>
                 )}

@@ -8,12 +8,12 @@ type Props = { report?: AuditReport };
  */
 export default function ResultsPanel({ report }: Props) {
   if (!report) {
-    return <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/60 px-4 py-8 text-sm text-slate-500">No report yet.</div>;
+    return <div className="rounded-[22px] border border-dashed px-4 py-8 text-sm" style={{ borderColor: 'var(--primary-soft)', backgroundColor: 'var(--primary-soft)', color: 'var(--text-secondary)' }}>No report yet.</div>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+      <div className="rounded-2xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ backgroundColor: 'var(--primary-soft)', color: 'var(--primary-strong)' }}>
         Report ID: {report.id}
       </div>
 
@@ -54,24 +54,24 @@ function ResultCard({ provider, raw, llmText, queries, competitors, sources }: a
   const [openRaw, setOpenRaw] = useState(false);
 
   return (
-    <div className="rounded-[22px] border border-emerald-100 bg-[var(--panel-alt)] p-4">
+    <div className="rounded-[22px] border p-4" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
       <div className="mb-2 flex items-start justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800/80">{provider}</div>
-          <div className="mt-2 text-sm font-medium text-slate-800">Résumé</div>
-          <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{llmText ?? <span className="text-slate-400">No LLM summary available.</span>}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--primary-strong)' }}>{provider}</div>
+          <div className="mt-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>Résumé</div>
+          <div className="mt-1 whitespace-pre-wrap text-sm leading-6" style={{ color: 'var(--foreground)' }}>{llmText ?? <span style={{ color: 'var(--text-secondary)' }}>No LLM summary available.</span>}</div>
         </div>
         <div className="ml-4 flex shrink-0 flex-col items-end gap-2">
-          <div className="text-xs text-slate-600">Queries: <strong className="text-slate-800">{(queries?.length ?? 0)}</strong></div>
-          <div className="text-xs text-slate-600">Competitors: <strong className="text-slate-800">{(competitors?.length ?? 0)}</strong></div>
-          <div className="text-xs text-slate-600">Sources: <strong className="text-slate-800">{(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</strong></div>
+          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Queries: <strong style={{ color: 'var(--foreground)' }}>{(queries?.length ?? 0)}</strong></div>
+          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Competitors: <strong style={{ color: 'var(--foreground)' }}>{(competitors?.length ?? 0)}</strong></div>
+          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sources: <strong style={{ color: 'var(--foreground)' }}>{(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</strong></div>
         </div>
       </div>
 
       {queries && queries.length > 0 && (
         <div className="mt-3">
-          <div className="text-sm font-medium text-slate-800">Queries Variations</div>
-          <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
+          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Queries Variations</div>
+          <ul className="mt-2 list-disc pl-5 text-sm" style={{ color: 'var(--foreground)' }}>
             {queries.map((q: string, i: number) => (
               <li key={i}>{q}</li>
             ))}
@@ -81,12 +81,12 @@ function ResultCard({ provider, raw, llmText, queries, competitors, sources }: a
 
       {competitors && competitors.length > 0 && (
         <div className="mt-3">
-          <div className="text-sm font-medium text-slate-800">Top Competitors</div>
-          <ul className="mt-2 grid gap-1 text-sm text-slate-700">
+          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Top Competitors</div>
+          <ul className="mt-2 grid gap-1 text-sm" style={{ color: 'var(--foreground)' }}>
             {competitors.slice(0, 5).map((c: any, i: number) => (
               <li key={i} className="flex items-center justify-between">
                 <span>{c.name ?? c.title ?? JSON.stringify(c)}</span>
-                <span className="text-xs text-slate-500">#{c.positionning ?? c.position ?? i}</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>#{c.positionning ?? c.position ?? i}</span>
               </li>
             ))}
           </ul>
@@ -95,10 +95,10 @@ function ResultCard({ provider, raw, llmText, queries, competitors, sources }: a
 
       {sources && (
         <div className="mt-3">
-          <div className="text-sm font-medium text-slate-800">Sources</div>
-          <div className="mt-1 text-sm text-slate-700">Used: {(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</div>
+          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Sources</div>
+          <div className="mt-1 text-sm" style={{ color: 'var(--foreground)' }}>Used: {(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</div>
           {sources?.metadata?.used_sources && (
-            <details className="mt-2 text-sm text-slate-700">
+            <details className="mt-2 text-sm" style={{ color: 'var(--foreground)' }}>
               <summary className="cursor-pointer">Voir les sources utilisées</summary>
               <ul className="mt-2 pl-4 list-disc">
                 {sources.metadata.used_sources.map((s: any, i: number) => (
@@ -113,14 +113,14 @@ function ResultCard({ provider, raw, llmText, queries, competitors, sources }: a
       )}
 
       <div className="mt-4 flex items-center justify-between">
-        <button onClick={() => setOpenRaw((v) => !v)} className="text-sm text-emerald-700 underline">
+        <button onClick={() => setOpenRaw((v) => !v)} className="text-sm underline" style={{ color: 'var(--primary)' }}>
           {openRaw ? 'Cacher JSON' : 'Voir JSON brut'}
         </button>
-        {raw?.error && <div className="text-sm font-medium text-red-600">Error: {raw.error}</div>}
+        {raw?.error && <div className="text-sm font-medium" style={{ color: '#d46a6a' }}>Error: {raw.error}</div>}
       </div>
 
       {openRaw && (
-        <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-white/50 p-3 text-sm text-slate-700">{JSON.stringify(raw?.metadata?.raw ?? raw, null, 2)}</pre>
+        <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md p-3 text-sm" style={{ backgroundColor: 'var(--panel-alt)', color: 'var(--foreground)' }}>{JSON.stringify(raw?.metadata?.raw ?? raw, null, 2)}</pre>
       )}
     </div>
   );

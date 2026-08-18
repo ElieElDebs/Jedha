@@ -41,7 +41,7 @@ export default function QueryEditor({ onSubmit }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700">Query</label>
+        <label className="mb-2 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Query</label>
         <textarea
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -52,7 +52,7 @@ export default function QueryEditor({ onSubmit }: Props) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">Patterns (comma separated)</label>
+          <label className="mb-2 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Patterns (comma separated)</label>
           <input
             value={patterns}
             onChange={(e) => setPatterns(e.target.value)}
@@ -61,8 +61,8 @@ export default function QueryEditor({ onSubmit }: Props) {
           />
         </div>
         <div>
-          <label className="mb-2 block text-sm font-medium text-slate-700">Providers</label>
-          <div className="flex flex-wrap gap-2 rounded-2xl border border-[rgba(23,49,33,0.10)] bg-[var(--panel-alt)] p-2">
+          <label className="mb-2 block text-sm font-medium" style={{ color: 'var(--foreground)' }}>Providers</label>
+          <div className="flex flex-wrap gap-2 rounded-2xl border p-2" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
             {providerOptions.map((provider) => {
               const selected = providers.includes(provider);
               return (
@@ -70,11 +70,26 @@ export default function QueryEditor({ onSubmit }: Props) {
                   key={provider}
                   type="button"
                   onClick={() => toggleProvider(provider)}
-                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                    selected
-                      ? 'bg-[linear-gradient(135deg,#2f7d5e_0%,#7bbd9c_100%)] text-white shadow-sm'
-                      : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50'
-                  }`}
+                  className="rounded-full px-3 py-1.5 text-sm font-medium transition"
+                  style={selected ? {
+                    backgroundColor: 'var(--primary)',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(168, 213, 186, 0.2)'
+                  } : {
+                    backgroundColor: 'white',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--stroke)'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selected) {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--surface-soft)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selected) {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+                    }
+                  }}
                 >
                   {provider}
                 </button>
