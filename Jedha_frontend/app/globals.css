@@ -107,3 +107,146 @@ textarea {
     width: min(100% - 1rem, 1200px);
   }
 }
+
+/* Markdown Prose Styles */
+.prose {
+  color: var(--foreground);
+  line-height: 1.6;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: var(--foreground);
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.6em;
+}
+
+.prose h1 {
+  font-size: 1.875em;
+  border-bottom: 2px solid var(--primary-soft);
+  padding-bottom: 0.3em;
+}
+
+.prose h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--stroke);
+  padding-bottom: 0.2em;
+}
+
+.prose h3 {
+  font-size: 1.25em;
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-size: 1em;
+}
+
+.prose p {
+  margin: 0.8em 0;
+}
+
+.prose strong,
+.prose b {
+  font-weight: 600;
+  color: var(--primary-strong);
+}
+
+.prose em,
+.prose i {
+  font-style: italic;
+  color: var(--foreground);
+}
+
+.prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.prose a:hover {
+  color: var(--primary-strong);
+}
+
+.prose ul,
+.prose ol {
+  margin: 0.8em 0;
+  padding-left: 2em;
+}
+
+.prose li {
+  margin: 0.4em 0;
+}
+
+.prose ul li::marker {
+  color: var(--primary);
+}
+
+.prose ol li::marker {
+  color: var(--primary-strong);
+}
+
+.prose code {
+  background-color: var(--primary-soft);
+  color: var(--primary-strong);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.9em;
+}
+
+.prose pre {
+  background-color: var(--panel-alt);
+  color: var(--foreground);
+  padding: 1em;
+  border-radius: 0.5em;
+  border: 1px solid var(--stroke);
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.prose pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+}
+
+.prose blockquote {
+  border-left: 4px solid var(--primary);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--stroke);
+  padding: 0.5em;
+  text-align: left;
+}
+
+.prose th {
+  background-color: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--stroke);
+  margin: 1.5em 0;
+}

@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { query, provider } = body as { query: string; provider: string };
+    const { query, provider, assets } = body as { query: string; provider: string; assets?: string[] };
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json({ success: false, error: 'Invalid payload: missing query' }, { status: 400 });
@@ -30,7 +30,12 @@ export async function POST(req: Request) {
     }
 
     const path = provider.toLowerCase() === 'openai' ? '/report/openai/get/' : '/report/gemini/get/';
-    const url = `${backendUrl.replace(/\/$/, '')}${path}?prompt=${encodeURIComponent(sanitizedQuery)}`;
+    const params = new URLSearchParams();
+    params.append('prompt', sanitizedQuery);
+    if (assets && assets.length > 0) {
+      assets.forEach(asset => params.append('assets', asset));
+    }
+    const url = `${backendUrl.replace(/\/$/, '')}${path}?${params.toString()}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);

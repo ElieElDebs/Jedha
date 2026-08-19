@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { AuditReport } from '../../lib/types';
+import ReportDashboard from './ReportDashboard';
 
 type Props = { report?: AuditReport };
 
@@ -51,77 +52,45 @@ export default function ResultsPanel({ report }: Props) {
 }
 
 function ResultCard({ provider, raw, llmText, queries, competitors, sources }: any) {
-  const [openRaw, setOpenRaw] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+
+  const kpiData = sources?.metadata ?? sources ?? {};
+  const assets = kpiData?.assets_and_competitors_sorted ?? [];
+  const assetDetected = kpiData?.asset_detected ?? false;
 
   return (
-    <div className="rounded-[22px] border p-4" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
-      <div className="mb-2 flex items-start justify-between">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--primary-strong)' }}>{provider}</div>
-          <div className="mt-2 text-sm font-medium" style={{ color: 'var(--foreground)' }}>Résumé</div>
-          <div className="mt-1 whitespace-pre-wrap text-sm leading-6" style={{ color: 'var(--foreground)' }}>{llmText ?? <span style={{ color: 'var(--text-secondary)' }}>No LLM summary available.</span>}</div>
-        </div>
-        <div className="ml-4 flex shrink-0 flex-col items-end gap-2">
-          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Queries: <strong style={{ color: 'var(--foreground)' }}>{(queries?.length ?? 0)}</strong></div>
-          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Competitors: <strong style={{ color: 'var(--foreground)' }}>{(competitors?.length ?? 0)}</strong></div>
-          <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sources: <strong style={{ color: 'var(--foreground)' }}>{(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</strong></div>
-        </div>
-      </div>
+    <>
+      <ReportDashboard
+        provider={provider}
+        llmText={llmText}
+        queries={queries}
+        competitors={competitors || []}
+        sources={sources}
+        assets={assets}
+        assetDetected={assetDetected}
+        raw={raw}
+        error={raw?.error}
+      />
 
-      {queries && queries.length > 0 && (
-        <div className="mt-3">
-          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Queries Variations</div>
-          <ul className="mt-2 list-disc pl-5 text-sm" style={{ color: 'var(--foreground)' }}>
-            {queries.map((q: string, i: number) => (
-              <li key={i}>{q}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {competitors && competitors.length > 0 && (
-        <div className="mt-3">
-          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Top Competitors</div>
-          <ul className="mt-2 grid gap-1 text-sm" style={{ color: 'var(--foreground)' }}>
-            {competitors.slice(0, 5).map((c: any, i: number) => (
-              <li key={i} className="flex items-center justify-between">
-                <span>{c.name ?? c.title ?? JSON.stringify(c)}</span>
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>#{c.positionning ?? c.position ?? i}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {sources && (
-        <div className="mt-3">
-          <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Sources</div>
-          <div className="mt-1 text-sm" style={{ color: 'var(--foreground)' }}>Used: {(sources?.metadata?.number_of_used_sources ?? sources?.number_of_used_sources ?? 0)}</div>
-          {sources?.metadata?.used_sources && (
-            <details className="mt-2 text-sm" style={{ color: 'var(--foreground)' }}>
-              <summary className="cursor-pointer">Voir les sources utilisées</summary>
-              <ul className="mt-2 pl-4 list-disc">
-                {sources.metadata.used_sources.map((s: any, i: number) => (
-                  <li key={i} className="break-words">
-                    {typeof s === 'string' ? s : s.url ?? JSON.stringify(s)}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
-
-      <div className="mt-4 flex items-center justify-between">
-        <button onClick={() => setOpenRaw((v) => !v)} className="text-sm underline" style={{ color: 'var(--primary)' }}>
-          {openRaw ? 'Cacher JSON' : 'Voir JSON brut'}
+      {/* Raw JSON Toggle */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => setShowRaw(!showRaw)}
+          className="text-sm font-medium underline"
+          style={{ color: 'var(--primary)' }}
+        >
+          {showRaw ? 'Hide' : 'Show'} Raw JSON
         </button>
-        {raw?.error && <div className="text-sm font-medium" style={{ color: '#d46a6a' }}>Error: {raw.error}</div>}
       </div>
 
-      {openRaw && (
-        <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md p-3 text-sm" style={{ backgroundColor: 'var(--panel-alt)', color: 'var(--foreground)' }}>{JSON.stringify(raw?.metadata?.raw ?? raw, null, 2)}</pre>
+      {showRaw && (
+        <pre
+          className="mt-4 max-h-96 overflow-auto rounded-lg border p-4 text-xs"
+          style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)', color: 'var(--foreground)' }}
+        >
+          {JSON.stringify(raw?.metadata?.raw ?? raw, null, 2)}
+        </pre>
       )}
-    </div>
+    </>
   );
 }
