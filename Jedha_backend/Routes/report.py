@@ -11,11 +11,8 @@ router = APIRouter()
 print(os.getenv("API_KEY"))
 
 
-@router.get(
-    "/report/gemini/get/",
-    dependencies=[Security(get_api_key)]
-)
-def get_gemini_report(prompt: str) :
+@router.get("/report/gemini/get/", dependencies=[Security(get_api_key)])
+def get_gemini_report(prompt: str):
     """
     This Route return the Gemini Report for GEO
 
@@ -50,20 +47,20 @@ def get_gemini_report(prompt: str) :
 def get_openai_report(prompt: str):
 
     oas = OpenAISniffer(
-            api_key=os.getenv("AZURE_OPENAI_key"),
-            endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            assets_to_find=["Kozy"],
-            prompt=prompt,
-            model_name=os.getenv("AZURE_OPENAI_MODEL"),
-        )
-    
+        api_key=os.getenv("AZURE_OPENAI_key"),
+        endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        assets_to_find=["Kozy"],
+        prompt=prompt,
+        model_name=os.getenv("AZURE_OPENAI_MODEL"),
+    )
+
     try:
-    
+
         oas.generate_report()
-    
+
     except Exception as e:
         print("ERROR : Error while generating report")
         print(e)
         return {"status": 500, "message": "Internal Servor Error", "data": []}
-    
+
     return {"status": 200, "message": "Go to Data", "data": oas.report}

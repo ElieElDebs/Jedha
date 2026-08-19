@@ -3,6 +3,7 @@ from google.genai.types import GenerateContentConfig, GoogleSearch, Tool
 from openai import OpenAI
 from trafilatura import extract, fetch_url
 
+from App.Utils.kpi import detect_asset, sort_assets
 from App.Utils.gen_ai_kpi import (
     calculate_cosine_similarity_grounding,
     extract_competitors,
@@ -218,14 +219,35 @@ class OpenAISniffer(Sniffer):
 
         llm_text: str = self._response.output[1].content[0].text
 
+        # Extract the competitor brands mentioned in the LLM answer, via tool calling
+        competitors: list[dict[str, any]] = extract_competitors(llm_text)
+
+        assets: list[dict[str, any]] = list()
+        assets_detected: bool = False
+
+        for asset in self._assets_to_find:
+
+            temp_asset: dict[str, any] = detect_asset(asset, llm_text)
+
+            if temp_asset["count"] != 0:
+                assets_detected = True
+
+            assets.append(temp_asset)
+
+        if assets_detected == True:
+
+            for competitors_names in [name["name"].lower() for name in competitors]:
+                temp_asset: dict[str, any] = detect_asset(competitors_names, llm_text)
+                if temp_asset["count"] != 0:
+                    assets.append(temp_asset)
+
+            assets = sort_assets(assets=assets, key="first")
+
         # sources_markdown:list[tuple[str, str]] = [self.convert_html_to_markdown(url) for url in structure_sources]
         all_source_markdown: list[tuple[str, str]] = [
             self.convert_html_to_markdown(element["url"])
             for element in structure_used_sources
         ]
-
-        # Extract the competitor brands mentioned in the LLM answer, via tool calling
-        competitors: list[dict[str, any]] = extract_competitors(llm_text)
 
         structured_format: dict[str] = {
             "queries": self._response.output[0].action.queries,
@@ -242,6 +264,8 @@ class OpenAISniffer(Sniffer):
                 "kpi": {
                     "used_domains": self.count_used_domain(structure_used_sources),
                     "all_domains": self.count_all_domain(structure_sources),
+                    "asset_detected": assets_detected,
+                    "assets_and_competitors_sorted": assets,
                 },
             },
             "llm_output": {
@@ -405,6 +429,33 @@ class GeminiSniffer(Sniffer):
         # 4. Extract generated LLM text
         llm_text: str = self._response.text
 
+        # 7. Extract the competitor brands mentioned in the LLM answer, via
+        # tool calling
+        competitors: list[dict[str, any]] = extract_competitors(llm_text)
+
+        assets: list[dict[str, any]] = list()
+        assets_detected: bool = False
+
+        for asset in self._assets_to_find:
+
+            temp_asset: dict[str, any] = detect_asset(asset, llm_text)
+
+            if temp_asset["count"] != 0:
+                assets_detected = True
+
+                assets.append(temp_asset)
+
+            if assets_detected == True:
+
+                for competitors_names in [name["name"].lower() for name in competitors]:
+                    temp_asset: dict[str, any] = detect_asset(
+                        competitors_names, llm_text
+                    )
+                    if temp_asset["count"] != 0:
+                        assets.append(temp_asset)
+
+                assets = sort_assets(assets=assets, key="first")
+
         # 5. Convert used sources content to Markdown format
         all_source_markdown: list[tuple[str, str]] = [
             self.convert_html_to_markdown(element["url"])
@@ -430,10 +481,6 @@ class GeminiSniffer(Sniffer):
             if getattr(support, "segment", None) and support.segment.text
         ]
 
-        # 7. Extract the competitor brands mentioned in the LLM answer, via
-        # tool calling
-        competitors: list[dict[str, any]] = extract_competitors(llm_text)
-
         # 8. Format the structured dictionary output
         structured_format: dict[str, any] = {
             "queries": queries,
@@ -451,6 +498,8 @@ class GeminiSniffer(Sniffer):
                     "used_domains": self.count_used_domain(structure_used_sources),
                     "all_domains": self.count_all_domain(all_domain_titles),
                     "grounding_cosine_similarities": grounding_cosine_similarities,
+                    "asset_detected": assets_detected,
+                    "assets_and_competitors_sorted": assets,
                 },
             },
             "llm_output": {

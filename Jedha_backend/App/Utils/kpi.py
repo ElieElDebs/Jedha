@@ -479,7 +479,7 @@ def detect_language(text: str) -> str:
         return None
 
 
-def detect_patterns(text: str, regexes: list[str]) -> bool:
+def detect_patterns_obselete(text: str, regexes: list[str]) -> bool:
     """
     Uses a list of regexes to find in a specific text.
     The goal of this is to detect special sentence for a exemple the name of the Compagny
@@ -521,3 +521,66 @@ def detect_patterns(text: str, regexes: list[str]) -> bool:
             continue
 
     return False
+
+
+def detect_asset(asset: str, text: str) -> dict[str, any]:
+    """
+    Detect asset and they occurences
+
+    Argument :
+        asset (str) - The pattern to detect
+        text (str) - The text to search for the assets
+
+    Return :
+        {
+            'asset': 'ostra',
+            'count': 1,
+            'positions': [2695],
+            'first': 2695
+        }
+    """
+
+    asset_lower = asset.lower()
+    text_lower = text.lower()
+
+    positions = [match.start() for match in re.finditer(asset_lower, text_lower)]
+
+    answer: dict[str, any] = {
+        "asset": asset_lower,
+        "count": 0,
+        "positions": None,
+        "first": None,
+    }
+
+    if len(positions) == 0:
+        return answer
+
+    answer["count"] = len(positions)
+    answer["positions"] = positions
+    answer["first"] = positions[0]
+
+    return answer
+
+
+def sort_assets(assets: list[dict[str, any]], key: str) -> list[dict[str, any]]:
+    """
+    Sort all the assets based on a key
+
+    Argument :
+        assets (list) : The list of assets to sort
+        key (str) : The Dictionnary's key to use
+
+    Return :
+        List of the assets sorted
+    """
+
+    positions: list[dict[str, any]] = list()
+
+    for asset in assets:
+
+        if asset["count"] != 0:
+            positions.append(asset)
+
+    positions.sort(key=lambda asset_element: asset_element[key])
+
+    return positions
