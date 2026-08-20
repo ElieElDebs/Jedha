@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import GeoMonitoringDashboard from './GeoMonitoringDashboard';
 
 interface ReportRow {
   query: string;
@@ -220,9 +221,9 @@ export default function ReportsPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full">
       {/* Upload Section */}
-      <div className="rounded-[22px] border p-6" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
+      <div className="w-full rounded-[22px] border p-6 box-border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
         <h2 className="mb-4 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Upload Excel File</h2>
 
         <div
@@ -252,7 +253,7 @@ export default function ReportsPanel() {
 
       {/* File Preview */}
       {rows.length > 0 && (
-        <div className="rounded-[22px] border p-6" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
+        <div className="w-full rounded-[22px] border p-6 box-border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
           <h2 className="mb-4 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
             Preview ({rows.length} rows loaded)
           </h2>
@@ -286,7 +287,7 @@ export default function ReportsPanel() {
 
       {/* Action Buttons */}
       {rows.length > 0 && (
-        <div className="flex gap-3">
+        <div className="flex gap-3 w-full">
           <button
             onClick={generateBatchReports}
             disabled={loading}
@@ -307,64 +308,71 @@ export default function ReportsPanel() {
         </div>
       )}
 
-      {/* Results Section */}
+      {/* Results Section - Dashboard */}
       {results.length > 0 && (
-        <div className="rounded-[22px] border p-6" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Results</h2>
-            <button
-              onClick={downloadResults}
-              className="material-button-primary text-sm"
-            >
-              📥 Download Excel
-            </button>
-          </div>
+        <>
+          <div className="w-full rounded-[22px] border p-6 box-border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
+                Processing Results
+              </h2>
+              <button
+                onClick={downloadResults}
+                className="material-button-primary text-sm"
+              >
+                📥 Download Excel
+              </button>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ borderBottom: `2px solid var(--primary)` }}>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Query</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Status</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Gemini</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>OpenAI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.slice(0, 10).map((result, idx) => (
-                  <tr key={idx} style={{ borderBottom: `1px solid var(--stroke)` }}>
-                    <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--foreground)' }}>
-                      {result.query}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className="inline-flex px-2 py-1 rounded-full text-xs font-medium"
-                        style={{
-                          backgroundColor: result.status === 'success' ? '#ecfdf5' : result.status === 'error' ? '#fef3f2' : '#f3f4f6',
-                          color: result.status === 'success' ? '#059669' : result.status === 'error' ? '#dc2626' : '#6b7280',
-                        }}
-                      >
-                        {result.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {result.geminiResponse ? '✓' : '-'}
-                    </td>
-                    <td className="px-3 py-2">
-                      {result.openaiResponse ? '✓' : '-'}
-                    </td>
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr style={{ borderBottom: `2px solid var(--primary)` }}>
+                    <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Query</th>
+                    <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Status</th>
+                    <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>Gemini</th>
+                    <th className="text-left px-3 py-2 font-medium" style={{ color: 'var(--primary-strong)' }}>OpenAI</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {results.slice(0, 10).map((result, idx) => (
+                    <tr key={idx} style={{ borderBottom: `1px solid var(--stroke)` }}>
+                      <td className="px-3 py-2 max-w-xs truncate" style={{ color: 'var(--foreground)' }}>
+                        {result.query}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className="inline-flex px-2 py-1 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: result.status === 'success' ? '#ecfdf5' : result.status === 'error' ? '#fef3f2' : '#f3f4f6',
+                            color: result.status === 'success' ? '#059669' : result.status === 'error' ? '#dc2626' : '#6b7280',
+                          }}
+                        >
+                          {result.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {result.geminiResponse ? '✓' : '-'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {result.openaiResponse ? '✓' : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {results.length > 10 && (
+              <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Showing first 10 of {results.length} results
+              </p>
+            )}
           </div>
 
-          {results.length > 10 && (
-            <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Showing first 10 of {results.length} results
-            </p>
-          )}
-        </div>
+          {/* Dashboard */}
+          <GeoMonitoringDashboard results={results} />
+        </>
       )}
     </div>
   );
