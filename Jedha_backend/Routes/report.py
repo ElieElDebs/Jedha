@@ -25,6 +25,10 @@ def get_gemini_report(
         Dict with status and result
     """
 
+    print ("Voici la liste : ")
+    print (assets)
+    
+
     gs = GeminiSniffer(
         api_key=os.getenv("GEMINI_API_KEY"),
         endpoint=None,
@@ -52,6 +56,9 @@ def get_openai_report(
         ..., description="List of assets to detected in answer", min_length=1
     ),
 ):
+
+    print ("Voici la liste : ")
+    print (assets)
 
     oas = OpenAISniffer(
         api_key=os.getenv("AZURE_OPENAI_key"),
