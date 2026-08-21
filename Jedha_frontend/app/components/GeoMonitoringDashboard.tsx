@@ -1,5 +1,7 @@
 "use client";
 import { useMemo, useState } from 'react';
+import { parse as mdParse } from 'marked';
+import DOMPurify from 'dompurify';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -23,15 +25,37 @@ interface AuditResult {
   error?: string;
 }
 
+interface SourceRef {
+  title: string;
+  url: string;
+}
+
+interface RankedAsset {
+  asset: string;
+  count: number;
+  positions: number[] | null;
+  first: number | null;
+}
+
 interface ParsedResponse {
-  llm_output_text?: string;
-  sources_kpi_asset_detected?: boolean;
-  sources_kpi_assets_and_competitors_sorted?: Array<{ name: string; position: number }>;
-  sources_metadata_number_of_sources?: number;
-  sources_metadata_number_of_used_sources?: number;
-  sources_kpi_used_domains?: Array<[string, number]>;
-  sources_kpi_grounding_cosine_similarities?: number[];
   competitors?: Array<{ name: string; positionning: number }>;
+  queries?: string[];
+  sources?: {
+    metadata?: {
+      number_of_sources?: number;
+      number_of_used_sources?: number;
+      all_sources?: string[];
+      used_sources?: SourceRef[];
+      used_source_with_markdown?: Array<[string, string | null]>;
+    };
+    kpi?: {
+      used_domains?: Array<[string, number]>;
+      asset_detected?: boolean;
+      assets_and_competitors_sorted?: RankedAsset[];
+      grounding_cosine_similarities?: Array<{ text: string; cosine_similarity: number }>;
+    };
+  };
+  llm_output?: { text?: string };
   [key: string]: any;
 }
 
@@ -46,11 +70,46 @@ interface DashboardData {
   topDomains: Array<[string, number]>;
   grounding?: number;
   llmText?: string;
+  searchQueries: string[];
+  allSourceUrls: string[];
+  usedSourcesList: SourceRef[];
+  rankedAssets: RankedAsset[];
+  targetAsset: string;
+  scrapedSources: Array<{ url: string; markdown: string }>;
+  groundingSegments: Array<{ text: string; cosine_similarity: number }>;
 }
 
 type Props = {
   results: AuditResult[];
 };
+
+const getDomain = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
+// French + English stopwords, stripped of accents to match normalized tokens.
+const QUERY_STOPWORDS = new Set([
+  'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'a', 'en', 'dans', 'pour',
+  'sur', 'avec', 'par', 'est', 'qui', 'que', 'qu', 'ce', 'cet', 'cette', 'ces', 'au', 'aux',
+  'mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses', 'notre', 'nos', 'votre', 'vos',
+  'leur', 'leurs', 'se', 'plus', 'moins', 'tres', 'ne', 'pas', 'il', 'elle', 'ils', 'elles',
+  'on', 'nous', 'vous', 'je', 'tu', 'quel', 'quelle', 'quels', 'quelles', 'ou', 'comment',
+  'pourquoi', 'quand', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'for', 'is', 'are',
+  'with', 'by', 'what', 'how', 'where', 'when', 'which', 'who',
+]);
+
+const tokenizeQuery = (query: string): string[] =>
+  query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 2 && !QUERY_STOPWORDS.has(word));
 
 const parseJsonResponse = (response: any): ParsedResponse => {
   if (typeof response === 'string') {
@@ -63,63 +122,289 @@ const parseJsonResponse = (response: any): ParsedResponse => {
   return response || {};
 };
 
+const buildDashboardEntry = (result: AuditResult, engine: 'gemini' | 'openai', response: any): DashboardData => {
+  const parsed = parseJsonResponse(response);
+  const competitors = parsed.competitors || [];
+  const assetsSorted = parsed.sources?.kpi?.assets_and_competitors_sorted || [];
+  const assetIndex = assetsSorted.findIndex((a) => a.asset?.toLowerCase() === result.assets.toLowerCase());
+  const groundingScores = parsed.sources?.kpi?.grounding_cosine_similarities || [];
+
+  return {
+    query: result.query,
+    engine,
+    assetDetected: parsed.sources?.kpi?.asset_detected || false,
+    assetPosition: assetIndex >= 0 ? assetIndex + 1 : undefined,
+    competitors,
+    totalSources: parsed.sources?.metadata?.number_of_sources || 0,
+    usedSources: parsed.sources?.metadata?.number_of_used_sources || 0,
+    topDomains: parsed.sources?.kpi?.used_domains || [],
+    grounding: groundingScores.length
+      ? groundingScores.reduce((sum, g) => sum + g.cosine_similarity, 0) / groundingScores.length
+      : undefined,
+    llmText: parsed.llm_output?.text,
+    searchQueries: parsed.queries || [],
+    allSourceUrls: parsed.sources?.metadata?.all_sources || [],
+    usedSourcesList: parsed.sources?.metadata?.used_sources || [],
+    rankedAssets: assetsSorted,
+    targetAsset: result.assets,
+    scrapedSources: (parsed.sources?.metadata?.used_source_with_markdown || [])
+      .filter((entry): entry is [string, string] => !!entry[1])
+      .map(([url, markdown]) => ({ url, markdown })),
+    groundingSegments: groundingScores,
+  };
+};
+
 const aggregateResults = (results: AuditResult[]): DashboardData[] => {
   return results.flatMap(result => {
     const data: DashboardData[] = [];
-
-    if (result.geminiResponse) {
-      const parsed = parseJsonResponse(result.geminiResponse);
-      const competitors = parsed.competitors || [];
-      const assetPositioning = parsed.sources_kpi_assets_and_competitors_sorted || [];
-      const assetData = assetPositioning.find((a: any) => a.name?.toLowerCase() === result.assets.toLowerCase());
-
-      data.push({
-        query: result.query,
-        engine: 'gemini',
-        assetDetected: parsed.sources_kpi_asset_detected || false,
-        assetPosition: assetData?.position,
-        competitors,
-        totalSources: parsed.sources_metadata_number_of_sources || 0,
-        usedSources: parsed.sources_metadata_number_of_used_sources || 0,
-        topDomains: parsed.sources_kpi_used_domains || [],
-        grounding: parsed.sources_kpi_grounding_cosine_similarities?.length
-          ? parsed.sources_kpi_grounding_cosine_similarities.reduce((a, b) => a + b, 0) / parsed.sources_kpi_grounding_cosine_similarities.length
-          : undefined,
-        llmText: parsed.llm_output_text,
-      });
-    }
-
-    if (result.openaiResponse) {
-      const parsed = parseJsonResponse(result.openaiResponse);
-      const competitors = parsed.competitors || [];
-      const assetPositioning = parsed.sources_kpi_assets_and_competitors_sorted || [];
-      const assetData = assetPositioning.find((a: any) => a.name?.toLowerCase() === result.assets.toLowerCase());
-
-      data.push({
-        query: result.query,
-        engine: 'openai',
-        assetDetected: parsed.sources_kpi_asset_detected || false,
-        assetPosition: assetData?.position,
-        competitors,
-        totalSources: parsed.sources_metadata_number_of_sources || 0,
-        usedSources: parsed.sources_metadata_number_of_used_sources || 0,
-        topDomains: parsed.sources_kpi_used_domains || [],
-        grounding: parsed.sources_kpi_grounding_cosine_similarities?.length
-          ? parsed.sources_kpi_grounding_cosine_similarities.reduce((a, b) => a + b, 0) / parsed.sources_kpi_grounding_cosine_similarities.length
-          : undefined,
-        llmText: parsed.llm_output_text,
-      });
-    }
-
+    if (result.geminiResponse) data.push(buildDashboardEntry(result, 'gemini', result.geminiResponse));
+    if (result.openaiResponse) data.push(buildDashboardEntry(result, 'openai', result.openaiResponse));
     return data;
   });
 };
+
+function SourceList({ title, sources, emptyLabel }: { title: string; sources: SourceRef[]; emptyLabel: string }) {
+  return (
+    <div>
+      <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+        {title} ({sources.length})
+      </div>
+      {sources.length > 0 ? (
+        <ul className="max-h-56 space-y-1 overflow-y-auto pr-1">
+          {sources.map((s, i) => (
+            <li key={`${s.url}-${i}`}>
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate rounded px-2 py-1.5 text-xs hover:underline"
+                style={{ backgroundColor: 'var(--panel)', color: 'var(--primary)' }}
+                title={s.url}
+              >
+                {s.title || getDomain(s.url)}
+                <span className="ml-1" style={{ color: 'var(--text-secondary)' }}>· {getDomain(s.url)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>{emptyLabel}</div>
+      )}
+    </div>
+  );
+}
+
+function QueryDetailModal({ row, onClose }: { row: DashboardData; onClose: () => void }) {
+  const targetAsset = row.targetAsset;
+  const usedUrls = new Set(row.usedSourcesList.map(s => s.url));
+  const unusedSources: SourceRef[] = row.allSourceUrls
+    .filter(url => !usedUrls.has(url))
+    .map(url => ({ title: '', url }));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl rounded-[22px] border shadow-xl"
+        style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b p-5" style={{ borderColor: 'var(--stroke)' }}>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="capitalize rounded px-2 py-1 text-xs font-medium" style={{
+                backgroundColor: row.engine === 'gemini' ? '#ecfdf5' : '#fef3f2',
+                color: row.engine === 'gemini' ? '#059669' : '#991b1b'
+              }}>
+                {row.engine}
+              </span>
+              {targetAsset && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Asset: {targetAsset}</span>}
+            </div>
+            <h3 className="mt-2 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>{row.query}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full px-2.5 py-1 text-sm"
+            style={{ backgroundColor: 'var(--panel)', color: 'var(--text-secondary)' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-6 p-5">
+          {/* KPI strip */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+              <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>Brand Detected</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: row.assetDetected ? '#059669' : '#dc2626' }}>
+                {row.assetDetected ? '✓ Yes' : '○ No'}
+              </div>
+            </div>
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+              <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>Position</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--primary)' }}>
+                {row.assetPosition !== undefined ? `#${row.assetPosition}` : '-'}
+              </div>
+            </div>
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+              <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>Sources Used</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--primary)' }}>
+                {row.usedSources}/{row.totalSources}
+              </div>
+            </div>
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+              <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>Grounding</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--primary)' }}>
+                {row.grounding !== undefined ? `${Math.round(row.grounding * 100)}%` : 'N/A'}
+              </div>
+            </div>
+          </div>
+
+          {/* Search queries issued by the engine */}
+          {row.searchQueries.length > 0 && (
+            <div>
+              <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Search Queries Issued ({row.searchQueries.length})
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {row.searchQueries.map((q, i) => (
+                  <span key={i} className="rounded-full px-3 py-1 text-xs" style={{ backgroundColor: 'var(--panel)', color: 'var(--text-secondary)' }}>
+                    {q}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Brand & competitor ranking */}
+          {row.rankedAssets.length > 0 && (
+            <div>
+              <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Brand & Competitor Ranking
+              </div>
+              <ol className="space-y-1">
+                {row.rankedAssets.map((a, i) => {
+                  const isTarget = a.asset.toLowerCase() === targetAsset.toLowerCase();
+                  return (
+                    <li
+                      key={`${a.asset}-${i}`}
+                      className="flex items-center justify-between rounded px-3 py-1.5 text-sm"
+                      style={{
+                        backgroundColor: isTarget ? 'var(--primary-soft)' : 'var(--panel)',
+                        color: isTarget ? 'var(--primary-strong)' : 'var(--foreground)',
+                        fontWeight: isTarget ? 600 : 400,
+                      }}
+                    >
+                      <span>#{i + 1} {a.asset}{isTarget ? ' (your brand)' : ''}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{a.count} mention{a.count > 1 ? 's' : ''}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+
+          {/* LLM answer */}
+          {row.llmText && (
+            <div>
+              <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                LLM Answer
+              </div>
+              <div
+                className="prose prose-sm max-h-64 max-w-none overflow-y-auto rounded-lg border p-3 text-sm leading-6"
+                style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)', color: 'var(--foreground)' }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdParse(row.llmText) as string) }}
+              />
+            </div>
+          )}
+
+          {/* Grounded answer segments (Gemini only) */}
+          {row.groundingSegments.length > 0 && (
+            <div>
+              <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Grounded Answer Segments ({row.groundingSegments.length})
+              </div>
+              <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {row.groundingSegments.map((seg, i) => (
+                  <li
+                    key={i}
+                    className="rounded-lg border p-3 text-sm"
+                    style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)', color: 'var(--foreground)' }}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>
+                        Segment {i + 1}
+                      </span>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        style={{ backgroundColor: 'var(--primary-soft)', color: 'var(--primary-strong)' }}
+                      >
+                        {Math.round(seg.cosine_similarity * 100)}% match
+                      </span>
+                    </div>
+                    {seg.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Sources */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <SourceList title="Sources Used" sources={row.usedSourcesList} emptyLabel="No used-source detail available." />
+            <SourceList title="Sources Consulted, Not Used" sources={unusedSources} emptyLabel="No unused-source detail available." />
+          </div>
+
+          {/* Scraped content of used sources */}
+          {row.scrapedSources.length > 0 && (
+            <div>
+              <div className="mb-2 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Scraped Content ({row.scrapedSources.length})
+              </div>
+              <div className="space-y-2">
+                {row.scrapedSources.map((s, i) => (
+                  <details key={i} className="rounded-lg border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+                    <summary
+                      className="cursor-pointer select-none px-3 py-2 text-sm font-medium"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      {getDomain(s.url)}
+                    </summary>
+                    <div className="border-t px-3 py-3" style={{ borderColor: 'var(--stroke)' }}>
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mb-2 block truncate text-xs hover:underline"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {s.url}
+                      </a>
+                      <div
+                        className="prose prose-sm max-h-64 max-w-none overflow-y-auto text-sm leading-6"
+                        style={{ color: 'var(--foreground)' }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdParse(s.markdown) as string) }}
+                      />
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function GeoMonitoringDashboard({ results }: Props) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [engineFilter, setEngineFilter] = useState<'all' | 'gemini' | 'openai'>('all');
   const [assetFilter, setAssetFilter] = useState<'all' | 'detected' | 'notDetected'>('all');
+  const [selectedRow, setSelectedRow] = useState<DashboardData | null>(null);
 
   const dashboardData = useMemo(() => aggregateResults(results), [results]);
 
@@ -178,6 +463,24 @@ export default function GeoMonitoringDashboard({ results }: Props) {
       .slice(0, 10);
   }, [dashboardData]);
 
+  // Reformulated search queries: word frequency
+  const allSearchQueries = useMemo(
+    () => dashboardData.flatMap(d => d.searchQueries),
+    [dashboardData]
+  );
+
+  const topReformulatedWords = useMemo(() => {
+    const wordCounts: Record<string, number> = {};
+    allSearchQueries.forEach(q => {
+      tokenizeQuery(q).forEach(word => {
+        wordCounts[word] = (wordCounts[word] || 0) + 1;
+      });
+    });
+    return Object.entries(wordCounts)
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [allSearchQueries]);
 
   // Position distribution
   const positionDistribution = useMemo(() => {
@@ -244,6 +547,19 @@ export default function GeoMonitoringDashboard({ results }: Props) {
     columnHelper.accessor('usedSources', {
       header: 'Sources Used',
       cell: (info: any) => `${info.getValue()}/${dashboardData.find(d => d.query === info.row.original.query && d.engine === info.row.original.engine)?.totalSources || 0}`,
+    }),
+    columnHelper.display({
+      id: 'details',
+      header: '',
+      cell: (info: any) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); setSelectedRow(info.row.original); }}
+          className="rounded px-2 py-1 text-xs font-medium"
+          style={{ backgroundColor: 'var(--primary-soft)', color: 'var(--primary)' }}
+        >
+          View →
+        </button>
+      ),
     }),
   ];
 
@@ -379,6 +695,29 @@ export default function GeoMonitoringDashboard({ results }: Props) {
             </ResponsiveContainer>
           </div>
         )}
+
+        {/* Reformulated Queries — Top Words */}
+        {topReformulatedWords.length > 0 && (
+          <div className="mt-8">
+            <h3 className="mb-1 text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+              💬 Reformulated Queries — Top 5 Words
+            </h3>
+            <p className="mb-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Based on {allSearchQueries.length} search {allSearchQueries.length > 1 ? 'queries' : 'query'} issued by the engines, across all rows.
+            </p>
+            <div style={{ width: '100%', height: 220, maxWidth: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topReformulatedWords} layout="vertical" margin={{ left: 70, right: 30, top: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis dataKey="word" type="category" width={90} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--primary)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Bloc 4: Détail par Requête */}
@@ -443,7 +782,14 @@ export default function GeoMonitoringDashboard({ results }: Props) {
             <tbody>
               {table.getRowModel().rows.length > 0 ? (
                 table.getRowModel().rows.map((row: any) => (
-                  <tr key={row.id} style={{ borderBottom: `1px solid var(--stroke)` }}>
+                  <tr
+                    key={row.id}
+                    onClick={() => setSelectedRow(row.original)}
+                    className="cursor-pointer transition-colors"
+                    style={{ borderBottom: `1px solid var(--stroke)` }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'var(--surface-soft)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.backgroundColor = 'transparent'; }}
+                  >
                     {row.getVisibleCells().map((cell: any) => (
                       <td key={cell.id} className="px-4 py-3" style={{ color: 'var(--foreground)' }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -488,6 +834,8 @@ export default function GeoMonitoringDashboard({ results }: Props) {
           </div>
         </div>
       </section>
+
+      {selectedRow && <QueryDetailModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
     </div>
   );
 }

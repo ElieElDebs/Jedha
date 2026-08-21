@@ -12,7 +12,7 @@ export default function ReportsPage() {
       <Header onToggle={() => setSidebarOpen((v) => !v)} />
       <div className="container flex flex-col gap-6 px-0 py-6 lg:flex-row lg:items-start lg:py-8">
         <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 lg:ml-[280px]">
+        <main className="min-w-0 flex-1 lg:ml-[280px]">
           <div className="space-y-6">
             <section className="material-card overflow-hidden p-0">
               <div className="p-5 sm:p-6" style={{ backgroundColor: 'var(--primary-soft)' }}>
