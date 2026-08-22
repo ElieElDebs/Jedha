@@ -46,7 +46,7 @@ interface ParsedResponse {
       number_of_used_sources?: number;
       all_sources?: string[];
       used_sources?: SourceRef[];
-      used_source_with_markdown?: Array<[string, string | null]>;
+      used_source_with_markdown?: Array<[string, string | null, RankedAsset[] | null]>;
     };
     kpi?: {
       used_domains?: Array<[string, number]>;
@@ -75,8 +75,9 @@ interface DashboardData {
   usedSourcesList: SourceRef[];
   rankedAssets: RankedAsset[];
   targetAsset: string;
-  scrapedSources: Array<{ url: string; markdown: string }>;
+  scrapedSources: Array<{ url: string; markdown: string; assetMatches: RankedAsset[] }>;
   groundingSegments: Array<{ text: string; cosine_similarity: number }>;
+  assetDetectedInSources: boolean;
 }
 
 type Props = {
@@ -128,6 +129,9 @@ const buildDashboardEntry = (result: AuditResult, engine: 'gemini' | 'openai', r
   const assetsSorted = parsed.sources?.kpi?.assets_and_competitors_sorted || [];
   const assetIndex = assetsSorted.findIndex((a) => a.asset?.toLowerCase() === result.assets.toLowerCase());
   const groundingScores = parsed.sources?.kpi?.grounding_cosine_similarities || [];
+  const scrapedSources = (parsed.sources?.metadata?.used_source_with_markdown || [])
+    .filter((entry): entry is [string, string, RankedAsset[] | null] => !!entry[1])
+    .map(([url, markdown, assetMatches]) => ({ url, markdown, assetMatches: assetMatches || [] }));
 
   return {
     query: result.query,
@@ -147,10 +151,9 @@ const buildDashboardEntry = (result: AuditResult, engine: 'gemini' | 'openai', r
     usedSourcesList: parsed.sources?.metadata?.used_sources || [],
     rankedAssets: assetsSorted,
     targetAsset: result.assets,
-    scrapedSources: (parsed.sources?.metadata?.used_source_with_markdown || [])
-      .filter((entry): entry is [string, string] => !!entry[1])
-      .map(([url, markdown]) => ({ url, markdown })),
+    scrapedSources,
     groundingSegments: groundingScores,
+    assetDetectedInSources: scrapedSources.some((s) => s.assetMatches.some((a) => a.count > 0)),
   };
 };
 
@@ -235,11 +238,17 @@ function QueryDetailModal({ row, onClose }: { row: DashboardData; onClose: () =>
 
         <div className="space-y-6 p-5">
           {/* KPI strip */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
               <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>Brand Detected</div>
               <div className="mt-1 text-lg font-bold" style={{ color: row.assetDetected ? '#059669' : '#dc2626' }}>
                 {row.assetDetected ? '✓ Yes' : '○ No'}
+              </div>
+            </div>
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+              <div className="text-[11px] uppercase" style={{ color: 'var(--text-secondary)' }}>In Sources</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: row.assetDetectedInSources ? '#059669' : '#dc2626' }}>
+                {row.assetDetectedInSources ? '✓ Yes' : '○ No'}
               </div>
             </div>
             <div className="rounded-lg border p-3" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
@@ -364,32 +373,43 @@ function QueryDetailModal({ row, onClose }: { row: DashboardData; onClose: () =>
                 Scraped Content ({row.scrapedSources.length})
               </div>
               <div className="space-y-2">
-                {row.scrapedSources.map((s, i) => (
-                  <details key={i} className="rounded-lg border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
-                    <summary
-                      className="cursor-pointer select-none px-3 py-2 text-sm font-medium"
-                      style={{ color: 'var(--primary)' }}
-                    >
-                      {getDomain(s.url)}
-                    </summary>
-                    <div className="border-t px-3 py-3" style={{ borderColor: 'var(--stroke)' }}>
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mb-2 block truncate text-xs hover:underline"
-                        style={{ color: 'var(--text-secondary)' }}
+                {row.scrapedSources.map((s, i) => {
+                  const detectedMatches = s.assetMatches.filter((a) => a.count > 0);
+                  return (
+                    <details key={i} className="rounded-lg border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}>
+                      <summary
+                        className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium"
+                        style={{ color: 'var(--primary)' }}
                       >
-                        {s.url}
-                      </a>
-                      <div
-                        className="prose prose-sm max-h-64 max-w-none overflow-y-auto text-sm leading-6"
-                        style={{ color: 'var(--foreground)' }}
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdParse(s.markdown) as string) }}
-                      />
-                    </div>
-                  </details>
-                ))}
+                        <span>{getDomain(s.url)}</span>
+                        {detectedMatches.length > 0 && (
+                          <span
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                            style={{ backgroundColor: '#ecfdf5', color: '#059669' }}
+                          >
+                            ✓ Brand mentioned ({detectedMatches.reduce((sum, a) => sum + a.count, 0)}x)
+                          </span>
+                        )}
+                      </summary>
+                      <div className="border-t px-3 py-3" style={{ borderColor: 'var(--stroke)' }}>
+                        <a
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mb-2 block truncate text-xs hover:underline"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          {s.url}
+                        </a>
+                        <div
+                          className="prose prose-sm max-h-64 max-w-none overflow-y-auto text-sm leading-6"
+                          style={{ color: 'var(--foreground)' }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdParse(s.markdown) as string) }}
+                        />
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -424,6 +444,11 @@ export default function GeoMonitoringDashboard({ results }: Props) {
       return (detected.reduce((sum, d) => sum + (d.assetPosition || 0), 0) / detected.length).toFixed(1);
     };
 
+    const calcSourceDetectionRate = (data: DashboardData[]) => {
+      if (data.length === 0) return 0;
+      return Math.round((data.filter(d => d.assetDetectedInSources).length / data.length) * 100);
+    };
+
     return {
       globalVisibility: calcVisibility(dashboardData),
       geminiVisibility: calcVisibility(gemini),
@@ -432,6 +457,7 @@ export default function GeoMonitoringDashboard({ results }: Props) {
       geminiAvgPosition: calcAvgPosition(gemini),
       openaiAvgPosition: calcAvgPosition(openai),
       totalQueries: dashboardData.length,
+      sourceDetectionRate: calcSourceDetectionRate(dashboardData),
     };
   }, [dashboardData]);
 
@@ -544,6 +570,17 @@ export default function GeoMonitoringDashboard({ results }: Props) {
       header: 'Position',
       cell: (info: any) => info.getValue() !== undefined ? `#${info.getValue()}` : '-',
     }),
+    columnHelper.accessor('assetDetectedInSources', {
+      header: 'In Sources',
+      cell: (info: any) => (
+        <span style={{
+          color: info.getValue() ? '#059669' : '#dc2626',
+          fontWeight: 'bold'
+        }}>
+          {info.getValue() ? '✓' : '○'}
+        </span>
+      ),
+    }),
     columnHelper.accessor('usedSources', {
       header: 'Sources Used',
       cell: (info: any) => `${info.getValue()}/${dashboardData.find(d => d.query === info.row.original.query && d.engine === info.row.original.engine)?.totalSources || 0}`,
@@ -607,6 +644,24 @@ export default function GeoMonitoringDashboard({ results }: Props) {
             <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
               Avg Position: #{kpis.openaiAvgPosition}
             </div>
+          </div>
+        </div>
+
+        {/* Detected in Consulted Sources */}
+        <div
+          className="mb-6 flex items-center justify-between rounded-lg border p-4"
+          style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}
+        >
+          <div>
+            <div className="text-xs font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>
+              Detected in Consulted Sources
+            </div>
+            <div className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Brand found in the scraped source pages, regardless of whether it made it into the final answer
+            </div>
+          </div>
+          <div className="shrink-0 text-3xl font-bold" style={{ color: 'var(--primary)' }}>
+            {kpis.sourceDetectionRate}%
           </div>
         </div>
 
