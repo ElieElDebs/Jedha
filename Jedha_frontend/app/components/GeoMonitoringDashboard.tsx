@@ -1,7 +1,10 @@
 "use client";
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { parse as mdParse } from 'marked';
 import DOMPurify from 'dompurify';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -102,6 +105,20 @@ const QUERY_STOPWORDS = new Set([
   'pourquoi', 'quand', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'for', 'is', 'are',
   'with', 'by', 'what', 'how', 'where', 'when', 'which', 'who',
 ]);
+
+const markdownToPlainText = (markdown: string): string =>
+  markdown
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/^>\s?/gm, '')
+    .replace(/^[-*+]\s+/gm, '- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
 const tokenizeQuery = (query: string): string[] =>
   query
@@ -425,6 +442,12 @@ export default function GeoMonitoringDashboard({ results }: Props) {
   const [engineFilter, setEngineFilter] = useState<'all' | 'gemini' | 'openai'>('all');
   const [assetFilter, setAssetFilter] = useState<'all' | 'detected' | 'notDetected'>('all');
   const [selectedRow, setSelectedRow] = useState<DashboardData | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const positionChartRef = useRef<HTMLDivElement>(null);
+  const competitorChartRef = useRef<HTMLDivElement>(null);
+  const domainsChartRef = useRef<HTMLDivElement>(null);
+  const wordsChartRef = useRef<HTMLDivElement>(null);
 
   const dashboardData = useMemo(() => aggregateResults(results), [results]);
 
@@ -611,8 +634,318 @@ export default function GeoMonitoringDashboard({ results }: Props) {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  const captureChart = async (el: HTMLDivElement | null): Promise<{ dataUrl: string; ratio: number } | null> => {
+    if (!el) return null;
+    const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: '#ffffff' });
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.85), ratio: canvas.width / canvas.height };
+  };
+
+  const handleDownloadPdf = async () => {
+    if (dashboardData.length === 0) return;
+    setGeneratingPdf(true);
+    try {
+      const [positionImg, competitorImg, domainsImg, wordsImg] = await Promise.all([
+        captureChart(positionChartRef.current),
+        captureChart(competitorChartRef.current),
+        captureChart(domainsChartRef.current),
+        captureChart(wordsChartRef.current),
+      ]);
+
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const ensureSpace = (needed: number) => {
+        if (y + needed > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      const addHeading = (text: string) => {
+        ensureSpace(10);
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+        doc.text(text, margin, y);
+        y += 7;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+      };
+
+      const addChartImage = (chart: { dataUrl: string; ratio: number } | null, heading: string) => {
+        if (!chart) return;
+        const imgHeight = contentWidth / chart.ratio;
+        ensureSpace(10 + imgHeight + 8);
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(40, 40, 40);
+        doc.text(heading, margin, y);
+        y += 7;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.addImage(chart.dataUrl, 'JPEG', margin, y, contentWidth, imgHeight);
+        y += imgHeight + 8;
+      };
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GEO Audit Report', margin, y);
+      y += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120, 120, 120);
+      doc.text(
+        `Generated ${new Date().toLocaleString()} - ${dashboardData.length} result(s) across ${new Set(dashboardData.map(d => d.query)).size} quer${new Set(dashboardData.map(d => d.query)).size > 1 ? 'ies' : 'y'}`,
+        margin, y
+      );
+      doc.setTextColor(0, 0, 0);
+      y += 10;
+
+      // KPI summary
+      addHeading('Brand Visibility');
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 9 },
+        head: [['Metric', 'Value']],
+        body: [
+          ['Global visibility rate', `${kpis.globalVisibility}%`],
+          ['Gemini visibility', `${kpis.geminiVisibility}% (avg position #${kpis.geminiAvgPosition})`],
+          ['OpenAI visibility', `${kpis.openaiVisibility}% (avg position #${kpis.openaiAvgPosition})`],
+          ['Detected in consulted sources', `${kpis.sourceDetectionRate}%`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      addChartImage(positionImg, 'Position Distribution');
+      addChartImage(competitorImg, 'Competitive Landscape');
+
+      // Source analysis stats
+      addHeading('Source Analysis');
+      const avgConsulted = dashboardData.reduce((sum, d) => sum + d.totalSources, 0) / Math.max(dashboardData.length, 1);
+      const avgUsed = dashboardData.reduce((sum, d) => sum + d.usedSources, 0) / Math.max(dashboardData.length, 1);
+      const avgUtilization = dashboardData.length > 0
+        ? Math.round((dashboardData.reduce((sum, d) => sum + (d.totalSources > 0 ? d.usedSources / d.totalSources : 0), 0) / dashboardData.length) * 100)
+        : 0;
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 9 },
+        head: [['Metric', 'Value']],
+        body: [
+          ['Avg sources consulted', avgConsulted.toFixed(1)],
+          ['Avg sources used', avgUsed.toFixed(1)],
+          ['Avg utilization', `${avgUtilization}%`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      addChartImage(domainsImg, 'Top Domains');
+      addChartImage(wordsImg, 'Reformulated Queries - Top Words');
+
+      // Detailed query results
+      addHeading('Detailed Query Results');
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8 },
+        head: [['Query', 'Engine', 'Brand Detected', 'In Sources', 'Position', 'Sources Used']],
+        body: dashboardData.map(d => [
+          d.query,
+          d.engine,
+          d.assetDetected ? 'Yes' : 'No',
+          d.assetDetectedInSources ? 'Yes' : 'No',
+          d.assetPosition !== undefined ? `#${d.assetPosition}` : '-',
+          `${d.usedSources}/${d.totalSources}`,
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+        columnStyles: { 0: { cellWidth: contentWidth * 0.4 } },
+      });
+
+      // Per-query detail (mirrors the "View" modal), one section per query/engine pair.
+      dashboardData.forEach((d, index) => {
+        doc.addPage();
+        y = margin;
+
+        doc.setFillColor(232, 243, 237);
+        doc.rect(margin, y, contentWidth, 9, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`Query ${index + 1} of ${dashboardData.length} - ${d.engine.toUpperCase()} - Asset: ${d.targetAsset}`, margin + 3, y + 6);
+        y += 13;
+        doc.setTextColor(0, 0, 0);
+
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        const queryLines = doc.splitTextToSize(d.query, contentWidth);
+        doc.text(queryLines, margin, y);
+        y += queryLines.length * 6 + 4;
+        doc.setFont('helvetica', 'normal');
+
+        autoTable(doc, {
+          startY: y,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8 },
+          head: [['Brand Detected', 'In Sources', 'Position', 'Sources Used', 'Grounding']],
+          body: [[
+            d.assetDetected ? 'Yes' : 'No',
+            d.assetDetectedInSources ? 'Yes' : 'No',
+            d.assetPosition !== undefined ? `#${d.assetPosition}` : '-',
+            `${d.usedSources}/${d.totalSources}`,
+            d.grounding !== undefined ? `${Math.round(d.grounding * 100)}%` : 'N/A',
+          ]],
+          theme: 'grid',
+          headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+        });
+        y = (doc as any).lastAutoTable.finalY + 6;
+
+        const addSubheading = (text: string) => {
+          ensureSpace(10);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text(text, margin, y);
+          y += 5;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+        };
+
+        if (d.searchQueries.length > 0) {
+          addSubheading('Search Queries Issued');
+          const qLines = doc.splitTextToSize(d.searchQueries.join('   •   '), contentWidth);
+          ensureSpace(qLines.length * 4.5 + 4);
+          doc.text(qLines, margin, y);
+          y += qLines.length * 4.5 + 6;
+        }
+
+        if (d.rankedAssets.length > 0) {
+          addSubheading('Brand & Competitor Ranking');
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 8 },
+            head: [['#', 'Asset', 'Mentions']],
+            body: d.rankedAssets.map((a, i) => [
+              String(i + 1),
+              a.asset.toLowerCase() === d.targetAsset.toLowerCase() ? `* ${a.asset} (your brand)` : a.asset,
+              String(a.count),
+            ]),
+            theme: 'striped',
+            headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+          });
+          y = (doc as any).lastAutoTable.finalY + 6;
+        }
+
+        if (d.llmText) {
+          addSubheading('LLM Answer');
+          const lines = doc.splitTextToSize(markdownToPlainText(d.llmText), contentWidth);
+          lines.forEach((line: string) => {
+            ensureSpace(4.5);
+            doc.text(line, margin, y);
+            y += 4.5;
+          });
+          y += 4;
+        }
+
+        if (d.groundingSegments.length > 0) {
+          addSubheading('Grounded Answer Segments');
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 8 },
+            head: [['Segment', 'Match']],
+            body: d.groundingSegments.map(s => [s.text, `${Math.round(s.cosine_similarity * 100)}%`]),
+            columnStyles: { 0: { cellWidth: contentWidth - 25 }, 1: { cellWidth: 25 } },
+            theme: 'striped',
+            headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+          });
+          y = (doc as any).lastAutoTable.finalY + 6;
+        }
+
+        const usedUrls = new Set(d.usedSourcesList.map(s => s.url));
+        const unusedUrls = d.allSourceUrls.filter(u => !usedUrls.has(u));
+
+        if (d.usedSourcesList.length > 0) {
+          addSubheading(`Sources Used (${d.usedSourcesList.length})`);
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 7.5 },
+            body: d.usedSourcesList.map(s => [s.title || getDomain(s.url), s.url]),
+            theme: 'plain',
+            columnStyles: {
+              0: { cellWidth: contentWidth * 0.35, fontStyle: 'bold' },
+              1: { textColor: [90, 130, 200] },
+            },
+          });
+          y = (doc as any).lastAutoTable.finalY + 6;
+        }
+
+        if (unusedUrls.length > 0) {
+          addSubheading(`Sources Consulted, Not Used (${unusedUrls.length})`);
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 7.5, textColor: [110, 110, 110] },
+            body: unusedUrls.map(u => [u]),
+            theme: 'plain',
+          });
+          y = (doc as any).lastAutoTable.finalY + 6;
+        }
+
+        if (d.scrapedSources.length > 0) {
+          addSubheading(`Scraped Content (${d.scrapedSources.length})`);
+          autoTable(doc, {
+            startY: y,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 7.5 },
+            head: [['Source', 'Brand Mentioned', 'Excerpt']],
+            body: d.scrapedSources.map(s => {
+              const matches = s.assetMatches.filter(a => a.count > 0);
+              const mentioned = matches.length > 0
+                ? `Yes (${matches.reduce((sum, a) => sum + a.count, 0)}x)`
+                : 'No';
+              const plain = markdownToPlainText(s.markdown);
+              const excerpt = plain.slice(0, 220).trim() + (plain.length > 220 ? '…' : '');
+              return [getDomain(s.url), mentioned, excerpt];
+            }),
+            theme: 'striped',
+            headStyles: { fillColor: [168, 213, 186], textColor: [40, 40, 40] },
+            columnStyles: { 0: { cellWidth: contentWidth * 0.2 }, 1: { cellWidth: contentWidth * 0.18 } },
+          });
+          y = (doc as any).lastAutoTable.finalY + 6;
+        }
+      });
+
+      doc.save(`geo-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-8 py-6 w-full max-w-full">
+      {dashboardData.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={generatingPdf}
+            className="material-button-primary text-sm"
+          >
+            {generatingPdf ? 'Generating PDF...' : '📄 Download PDF'}
+          </button>
+        </div>
+      )}
+
       {/* Bloc 1: Visibilité Marque (KPI Principal) */}
       <section className="w-full rounded-[22px] border p-6 box-border overflow-x-auto" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
         <h2 className="mb-6 text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
@@ -667,7 +1000,7 @@ export default function GeoMonitoringDashboard({ results }: Props) {
 
         {/* Position Distribution Chart */}
         {positionDistribution.length > 0 && (
-          <div style={{ width: '100%', height: 300, maxWidth: '100%' }}>
+          <div ref={positionChartRef} style={{ width: '100%', height: 300, maxWidth: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={positionDistribution}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -688,7 +1021,7 @@ export default function GeoMonitoringDashboard({ results }: Props) {
         </h2>
 
         {competitorsData.length > 0 ? (
-          <div style={{ width: '100%', height: 400, maxWidth: '100%' }}>
+          <div ref={competitorChartRef} style={{ width: '100%', height: 400, maxWidth: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={competitorsData} layout="vertical" margin={{ left: 80, right: 30, top: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -738,7 +1071,7 @@ export default function GeoMonitoringDashboard({ results }: Props) {
 
         {/* Top Domains Chart */}
         {sourcesData.length > 0 && (
-          <div style={{ width: '100%', height: 350, maxWidth: '100%' }}>
+          <div ref={domainsChartRef} style={{ width: '100%', height: 350, maxWidth: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={sourcesData} margin={{ bottom: 80, left: 30, right: 30, top: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -760,7 +1093,7 @@ export default function GeoMonitoringDashboard({ results }: Props) {
             <p className="mb-4 text-xs" style={{ color: 'var(--text-secondary)' }}>
               Based on {allSearchQueries.length} search {allSearchQueries.length > 1 ? 'queries' : 'query'} issued by the engines, across all rows.
             </p>
-            <div style={{ width: '100%', height: 220, maxWidth: '100%' }}>
+            <div ref={wordsChartRef} style={{ width: '100%', height: 220, maxWidth: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topReformulatedWords} layout="vertical" margin={{ left: 70, right: 30, top: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" />
