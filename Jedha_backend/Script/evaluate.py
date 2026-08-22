@@ -26,7 +26,7 @@ AZURE_OPENAI_key = os.getenv("AZURE_OPENAI_key")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME")
 
-ASSETS_TO_FINDS = ["kozy", "KOZY", "KANOPE", "kanopé"]
+ASSETS_TO_FINDS = ["ostra", "ostra paris", "casa ostra"]
 
 PROMPT = input("Que recherchez-vous  : ")
 
@@ -65,10 +65,10 @@ print("Done ")
 
 print("---------- OPEN AI Result ----------")
 print(oar["llm_output"]["text"])
-with open("./Res/open_ai_result.json", "w", encoding="utf-8") as file:
+with open("./open_ai_result.json", "w", encoding="utf-8") as file:
     file.write(json.dumps(oar, indent=5))
 
 print("---------- GEMINI Result ----------")
 print(gr["llm_output"]["text"])
-with open("./Res/gemini_result.json", "w", encoding="utf-8") as file:
+with open("./gemini_result.json", "w", encoding="utf-8") as file:
     file.write(json.dumps(gr, indent=5))

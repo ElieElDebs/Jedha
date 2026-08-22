@@ -17,6 +17,7 @@ interface ReportResult extends ReportRow {
 
 export default function ReportsPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [results, setResults] = useState<ReportResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,6 +46,99 @@ export default function ReportsPanel() {
         setResults(validRows.map(row => ({ ...row, status: 'pending' })));
       } catch (error) {
         alert(`Error reading file: ${error}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const safeJsonParse = (value: any, fallback: any): any => {
+    if (!value) return fallback;
+    try {
+      return JSON.parse(String(value));
+    } catch {
+      return fallback;
+    }
+  };
+
+  // Rebuilds a Sniffer report object from one row of a previously exported
+  // Excel/ODS/CSV file. Mirrors flattenObject's `parent_child` key joining
+  // and per-type serialization (arrays of primitives -> "; "-joined,
+  // arrays of objects/tuples -> JSON string) so an exported report can be
+  // re-imported without re-querying the providers.
+  const reconstructReportFromFlatRow = (row: Record<string, any>): Record<string, any> => {
+    const str = (v: any): string => (v === undefined || v === null ? '' : String(v));
+    const splitList = (v: any): string[] => (str(v) ? str(v).split('; ') : []);
+
+    return {
+      queries: splitList(row['queries']),
+      engine: str(row['engine']),
+      competitors: safeJsonParse(row['competitors'], []),
+      sources: {
+        metadata: {
+          all_sources: splitList(row['sources_metadata_all_sources']),
+          used_sources: safeJsonParse(row['sources_metadata_used_sources'], []),
+          number_of_sources: Number(row['sources_metadata_number_of_sources']) || 0,
+          number_of_used_sources: Number(row['sources_metadata_number_of_used_sources']) || 0,
+          used_source_with_markdown: safeJsonParse(row['sources_metadata_used_source_with_markdown'], []),
+        },
+        kpi: {
+          used_domains: safeJsonParse(row['sources_kpi_used_domains'], []),
+          all_domains: safeJsonParse(row['sources_kpi_all_domains'], []),
+          asset_detected: str(row['sources_kpi_asset_detected']).toLowerCase() === 'true',
+          assets_and_competitors_sorted: safeJsonParse(row['sources_kpi_assets_and_competitors_sorted'], []),
+          grounding_cosine_similarities: safeJsonParse(row['sources_kpi_grounding_cosine_similarities'], []),
+        },
+      },
+      llm_output: { text: str(row['llm_output_text']) },
+    };
+  };
+
+  const handleImportReport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result as ArrayBuffer;
+        const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+
+        const merged = new Map<string, ReportResult>();
+
+        for (const sheetName of workbook.SheetNames) {
+          const sheetRows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
+
+          sheetRows.forEach((row) => {
+            const query = String(row['Query'] || '').trim();
+            if (!query) return;
+            const assets = String(row['Assets'] || '').trim();
+
+            const engine = String(row['engine'] || '').toLowerCase();
+            const field: 'geminiResponse' | 'openaiResponse' | null =
+              engine === 'google' ? 'geminiResponse'
+              : engine === 'openai' ? 'openaiResponse'
+              : sheetName.toLowerCase().includes('gemini') ? 'geminiResponse'
+              : sheetName.toLowerCase().includes('openai') ? 'openaiResponse'
+              : null;
+            if (!field) return;
+
+            const key = `${query}||${assets}`;
+            const existing: ReportResult = merged.get(key) || { query, assets, status: 'success' };
+            existing[field] = reconstructReportFromFlatRow(row);
+            merged.set(key, existing);
+          });
+        }
+
+        if (merged.size === 0) {
+          alert('No recognizable data found. Import a report exported from this app (the "Gemini"/"OpenAI" sheets, or an .ods/.csv with the same columns).');
+          return;
+        }
+
+        const importedResults = Array.from(merged.values());
+        setRows(importedResults.map(({ query, assets }) => ({ query, assets })));
+        setResults(importedResults);
+      } catch (error) {
+        alert(`Error reading report file: ${error}`);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -251,6 +345,38 @@ export default function ReportsPanel() {
         </div>
       </div>
 
+      {/* Import Existing Report */}
+      <div className="w-full rounded-[22px] border p-6 box-border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
+        <h2 className="mb-1 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>Import Existing Report</h2>
+        <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          Already ran this batch before? Import a previously exported report to view it here instead of re-running the queries.
+        </p>
+
+        <div
+          className="rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition"
+          style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel)' }}
+          onClick={() => importFileInputRef.current?.click()}
+        >
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,.ods,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,application/vnd.oasis.opendocument.spreadsheet"
+            onChange={handleImportReport}
+            className="hidden"
+          />
+          <div className="text-3xl mb-2">📂</div>
+          <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+            Click to import a report
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Supports: Excel (.xlsx, .xls) • CSV • OpenDocument (.ods)
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            Must have the same columns as the file produced by "Download Excel" below
+          </p>
+        </div>
+      </div>
+
       {/* File Preview */}
       {rows.length > 0 && (
         <div className="w-full rounded-[22px] border p-6 box-border" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--panel-alt)' }}>
@@ -300,6 +426,7 @@ export default function ReportsPanel() {
               setRows([]);
               setResults([]);
               if (fileInputRef.current) fileInputRef.current.value = '';
+              if (importFileInputRef.current) importFileInputRef.current.value = '';
             }}
             className="material-button-secondary"
           >

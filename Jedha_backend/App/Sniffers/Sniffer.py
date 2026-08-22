@@ -68,7 +68,9 @@ class Sniffer:
         self.report: dict[str, any] = None
 
     @staticmethod
-    def convert_html_to_markdown(url: str) -> tuple[str, str]:
+    def convert_html_to_markdown(
+        url: str, assets_to_detect: list[str]
+    ) -> tuple[str, str, list[dict[str, any]]]:
         """
         Function that fetch urls and transforms them into markdown format
 
@@ -92,8 +94,14 @@ class Sniffer:
 
         if markdown_content == None:  # It means that we need to activate Javascript
             print(f"The website {url} needs Advance Scrapping ...")
+            return (url, None, None)
 
-        return (url, markdown_content)
+        temp_assets: list[dict[str, any]] = list()
+
+        for asset in assets_to_detect:
+            temp_assets.append(detect_asset(asset=asset, text=markdown_content))
+
+        return (url, markdown_content, temp_assets)
 
 
 class OpenAISniffer(Sniffer):
@@ -245,7 +253,7 @@ class OpenAISniffer(Sniffer):
 
         # sources_markdown:list[tuple[str, str]] = [self.convert_html_to_markdown(url) for url in structure_sources]
         all_source_markdown: list[tuple[str, str]] = [
-            self.convert_html_to_markdown(element["url"])
+            self.convert_html_to_markdown(element["url"], self._assets_to_find)
             for element in structure_used_sources
         ]
 
@@ -266,6 +274,7 @@ class OpenAISniffer(Sniffer):
                     "all_domains": self.count_all_domain(structure_sources),
                     "asset_detected": assets_detected,
                     "assets_and_competitors_sorted": assets,
+                    "assets_detected_in_source": None,
                 },
             },
             "llm_output": {
@@ -458,7 +467,7 @@ class GeminiSniffer(Sniffer):
 
         # 5. Convert used sources content to Markdown format
         all_source_markdown: list[tuple[str, str]] = [
-            self.convert_html_to_markdown(element["url"])
+            self.convert_html_to_markdown(element["url"], self._assets_to_find)
             for element in structure_used_sources
         ]
 
